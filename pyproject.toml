@@ -1,0 +1,22 @@
+[project]
+name = "rlm-gemini-workflow"
+version = "0.1.0"
+description = "Recursive Language Model demo with SimpleAgents + workflow orchestration"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-dotenv>=1.2.1",
+    "pyyaml>=6.0.3",
+    "simple-agents-py",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.uv.sources]
+simple-agents-py = { path = "../SimpleAgents/crates/simple-agents-py" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

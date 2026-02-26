@@ -1,0 +1,22 @@
+# Workflow wrapper around Python RLM runner.
+# The recursive loop itself lives in handlers.py -> run_rlm.
+
+id: rlm-gemini-orchestrator
+version: 1.0.0
+
+metadata:
+  name: "RLM Gemini Orchestrator"
+  description: "Run Recursive Language Model logic through custom worker with OpenAI-compatible Gemini Flash"
+  tags: ["example", "workflow", "rlm", "gemini", "openai-compatible"]
+
+entry_node: run_rlm_core
+
+nodes:
+  - id: run_rlm_core
+    name: "Run RLM Core"
+    node_type:
+      custom_worker:
+        handler: RunRlm
+    config:
+      payload:
+        topic: rlm
