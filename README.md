@@ -2,6 +2,8 @@
 
 <div align="center">
 
+![RLM Poster](RLM.png)
+
 [![GitHub Repo](https://img.shields.io/badge/GitHub-SimpleAgentsRLM-181717?style=for-the-badge&logo=github)](https://github.com/CraftsMan-Labs/SimpleAgentsRLM)
 [![PyPI Package](https://img.shields.io/badge/PyPI-simple--agents--py-3775A9?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/simple-agents-py/)
 [![Monthly Downloads](https://img.shields.io/badge/Monthly%20Downloads-1%2C210-0A66C2?style=for-the-badge)](https://pypistats.org/packages/simple-agents-py)
@@ -30,23 +32,18 @@ The goal is simple: keep long context outside the one-shot prompt, reason with e
 
 ## Visual architecture
 
-```text
-Query + Long Context
-        |
-        v
-   RLM Root Loop
- (model -> repl code -> execute)
-        |
-        +--> llm_query(...) sub-call (optional)
-        |
-        v
- FINAL(...) / FINAL_VAR(...)
-        |
-        v
-   Final answer + trace
+```mermaid
+flowchart TD
+    A[Query + Long Context] --> B[RLM Root Loop<br/>model -> repl code -> execute]
+    B --> C[llm_query(...) sub-call<br/>(optional)]
+    B --> D[FINAL(...) / FINAL_VAR(...)]
+    C --> B
+    D --> E[Final answer + trace]
 
-Workflow path:
-run.py -> run_workflow_yaml -> rlm_orchestrator.yaml -> handlers.py -> RLM runner
+    F[run.py] --> G[run_workflow_yaml]
+    G --> H[rlm_orchestrator.yaml]
+    H --> I[handlers.py]
+    I --> J[RLM runner]
 ```
 
 ## Why this matches the RLM idea
