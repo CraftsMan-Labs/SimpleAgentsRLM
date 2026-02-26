@@ -1,0 +1,206 @@
+{
+  "config": {
+    "model": "gemini-3-flash",
+    "seed": 42,
+    "records": 400,
+    "baseline_context_chars": 2000,
+    "max_turns": 10,
+    "max_subcalls": 30
+  },
+  "by_method": {
+    "baseline_direct_truncated": {
+      "accuracy": 0.0,
+      "avg_elapsed_ms": 1090,
+      "max_elapsed_ms": 1163,
+      "avg_turns": null,
+      "avg_subcalls": null
+    },
+    "rlm_direct": {
+      "accuracy": 1.0,
+      "avg_elapsed_ms": 2344,
+      "max_elapsed_ms": 2688,
+      "avg_turns": 1,
+      "avg_subcalls": 0
+    },
+    "rlm_workflow": {
+      "accuracy": 1.0,
+      "avg_elapsed_ms": 2254.6666666666665,
+      "max_elapsed_ms": 2679,
+      "avg_turns": 1,
+      "avg_subcalls": 0
+    }
+  },
+  "rows": [
+    {
+      "task_id": "t1_beta_sum",
+      "task_description": "Linear aggregation over all rows",
+      "expected": 908,
+      "method": "baseline_direct_truncated",
+      "elapsed_ms": 1163,
+      "raw_answer": "88",
+      "parsed_answer": 88,
+      "correct": false
+    },
+    {
+      "task_id": "t1_beta_sum",
+      "task_description": "Linear aggregation over all rows",
+      "expected": 908,
+      "method": "rlm_direct",
+      "elapsed_ms": 1670,
+      "raw_answer": "908",
+      "parsed_answer": 908,
+      "turns": 1,
+      "subcalls": 0,
+      "termination_reason": "final_var",
+      "trace": [
+        {
+          "turn": 1,
+          "model_output_preview": "```repl\ntotal_sum = 0\nfor line in context.strip().split('\\n'):\n    if not line:\n        continue\n    parts = line.split('|')\n    data = {}\n    for p in parts:\n        k, v = p.split('=')\n        data[k] = v\n    if data.get('category') == 'beta':\n        total_sum += int(data.get('value', 0))\n```\n\nFINAL_VAR(total_sum)",
+          "code_blocks": 1,
+          "final_var": "total_sum",
+          "has_final_text": false,
+          "executions": [
+            {
+              "code_preview": "total_sum = 0\nfor line in context.strip().split('\\n'):\n    if not line:\n        continue\n    parts = line.split('|')\n    data = {}\n    for p in parts:\n        k, v = p.split('=')\n        data[k] = v\n    if data.get('category') == 'beta':\n        total_sum += int(data.get('value', 0))\n",
+              "stdout_preview": "",
+              "error": null
+            }
+          ]
+        }
+      ],
+      "correct": true
+    },
+    {
+      "task_id": "t1_beta_sum",
+      "task_description": "Linear aggregation over all rows",
+      "expected": 908,
+      "method": "rlm_workflow",
+      "elapsed_ms": 1643,
+      "raw_answer": "908",
+      "parsed_answer": 908,
+      "turns": 1,
+      "subcalls": 0,
+      "termination_reason": "final_var",
+      "workflow_terminal_node": "run_rlm_core",
+      "correct": true
+    },
+    {
+      "task_id": "t2_high_even_count",
+      "task_description": "Filter + count across full context",
+      "expected": 62,
+      "method": "baseline_direct_truncated",
+      "elapsed_ms": 1163,
+      "raw_answer": "5",
+      "parsed_answer": 5,
+      "correct": false
+    },
+    {
+      "task_id": "t2_high_even_count",
+      "task_description": "Filter + count across full context",
+      "expected": 62,
+      "method": "rlm_direct",
+      "elapsed_ms": 2674,
+      "raw_answer": "62",
+      "parsed_answer": 62,
+      "turns": 1,
+      "subcalls": 0,
+      "termination_reason": "final_text",
+      "trace": [
+        {
+          "turn": 1,
+          "model_output_preview": "```repl\n# Parse the context to count entries where urgency is high and value is even.\ncount = 0\nlines = context.strip().split('\\n')\nfor line in lines:\n    # Example format: idx=0|category=alpha|value=4|urgency=high\n    parts = line.split('|')\n    data = {}\n    for part in parts:\n        if '=' in part:\n            key, val = part.split('=', 1)\n            data[key] = val\n    \n    if data.get('urgency') == 'high':\n        try:\n            val_int = int(data.get('value', 0))\n            if val_int % 2 == 0:\n                count += 1\n        except ValueError:\n            continue\n\nprint(count)\n",
+          "code_blocks": 2,
+          "final_var": null,
+          "has_final_text": true,
+          "executions": [
+            {
+              "code_preview": "# Parse the context to count entries where urgency is high and value is even.\ncount = 0\nlines = context.strip().split('\\n')\nfor line in lines:\n    # Example format: idx=0|category=alpha|value=4|urgency=high\n    parts = line.split('|')\n    data = {}\n    for part in parts:\n        if '=' in part:\n            key, val = part.split('=', 1)\n            data[key] = val\n    \n    if data.get('urgency') == 'high':\n        try:\n            val_int = int(data.get('value', 0))\n            if val_int % 2 == ",
+              "stdout_preview": "62\n",
+              "error": null
+            },
+            {
+              "code_preview": "# Double check the logic and ensure all lines are processed\n# The context preview shows idx=0 (high, 4 - even) and idx=8 (high, 14 - even)\n# idx=7 is (high, 3 - odd).\n# The code correctly checks urgency == 'high' and value % 2 == 0.\n",
+              "stdout_preview": "",
+              "error": null
+            }
+          ],
+          "final_text_corrected_from_stdout": true
+        }
+      ],
+      "correct": true
+    },
+    {
+      "task_id": "t2_high_even_count",
+      "task_description": "Filter + count across full context",
+      "expected": 62,
+      "method": "rlm_workflow",
+      "elapsed_ms": 2679,
+      "raw_answer": "62",
+      "parsed_answer": 62,
+      "turns": 1,
+      "subcalls": 0,
+      "termination_reason": "final_text",
+      "workflow_terminal_node": "run_rlm_core",
+      "correct": true
+    },
+    {
+      "task_id": "t3_gamma_weighted",
+      "task_description": "Weighted aggregation requiring full scan",
+      "expected": 2527,
+      "method": "baseline_direct_truncated",
+      "elapsed_ms": 944,
+      "raw_answer": "285",
+      "parsed_answer": 285,
+      "correct": false
+    },
+    {
+      "task_id": "t3_gamma_weighted",
+      "task_description": "Weighted aggregation requiring full scan",
+      "expected": 2527,
+      "method": "rlm_direct",
+      "elapsed_ms": 2688,
+      "raw_answer": "2527",
+      "parsed_answer": 2527,
+      "turns": 1,
+      "subcalls": 0,
+      "termination_reason": "final_text",
+      "trace": [
+        {
+          "turn": 1,
+          "model_output_preview": "```repl\nimport re\n\ntotal_sum = 0\n# Pattern to match idx, category, and value\npattern = re.compile(r\"idx=(\\d+)\\|category=([^|]+)\\|value=(\\d+)\")\n\nfor match in pattern.finditer(context):\n    idx = int(match.group(1))\n    category = match.group(2)\n    value = int(match.group(3))\n    \n    if category == \"gamma\":\n        multiplier = 1 + (idx % 5)\n        total_sum += value * multiplier\n\nprint(f\"Result: {total_sum}\")\n```\n```repl\n# Double check the logic and the context format\n# The preview shows: idx=2|category=gamma|value=9 -> 9 * (1 + (2%5)) = 9 * 3 = 27\n# idx=6|category=gamma|value=4 -> 4 * (1 + ",
+          "code_blocks": 2,
+          "final_var": null,
+          "has_final_text": true,
+          "executions": [
+            {
+              "code_preview": "import re\n\ntotal_sum = 0\n# Pattern to match idx, category, and value\npattern = re.compile(r\"idx=(\\d+)\\|category=([^|]+)\\|value=(\\d+)\")\n\nfor match in pattern.finditer(context):\n    idx = int(match.group(1))\n    category = match.group(2)\n    value = int(match.group(3))\n    \n    if category == \"gamma\":\n        multiplier = 1 + (idx % 5)\n        total_sum += value * multiplier\n\nprint(f\"Result: {total_sum}\")\n",
+              "stdout_preview": "Result: 2527\n",
+              "error": null
+            },
+            {
+              "code_preview": "# Double check the logic and the context format\n# The preview shows: idx=2|category=gamma|value=9 -> 9 * (1 + (2%5)) = 9 * 3 = 27\n# idx=6|category=gamma|value=4 -> 4 * (1 + (6%5)) = 4 * 2 = 8\n# idx=10|category=gamma|value=1 -> 1 * (1 + (10%5)) = 1 * 1 = 1\n# Sum so far: 27 + 8 + 1 = 36.\n# The code will iterate through the entire context.\n",
+              "stdout_preview": "",
+              "error": null
+            }
+          ],
+          "final_text_corrected_from_stdout": true
+        }
+      ],
+      "correct": true
+    },
+    {
+      "task_id": "t3_gamma_weighted",
+      "task_description": "Weighted aggregation requiring full scan",
+      "expected": 2527,
+      "method": "rlm_workflow",
+      "elapsed_ms": 2442,
+      "raw_answer": "2527",
+      "parsed_answer": 2527,
+      "turns": 1,
+      "subcalls": 0,
+      "termination_reason": "final_text",
+      "workflow_terminal_node": "run_rlm_core",
+      "correct": true
+    }
+  ]
+}
