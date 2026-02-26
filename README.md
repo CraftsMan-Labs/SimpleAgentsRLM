@@ -7,6 +7,11 @@ Hello folks - this repo shows a practical, from-scratch implementation of a **Re
 
 The goal is simple: keep long context outside the one-shot prompt, reason with executable steps, and still keep workflow orchestration and traceability.
 
+## Package + downloads
+
+- Package: [`simple-agents-py`](https://pypi.org/project/simple-agents-py/)
+- Downloads (last month): **1,210** (source: [PyPIStats](https://pypistats.org/packages/simple-agents-py), fetched on 2026-02-27)
+
 ## What this repo contains
 
 - `rlm_runner.py` - core recursive loop (parse `repl` code, execute, finalize)
