@@ -34,9 +34,9 @@ The goal is simple: keep long context outside the one-shot prompt, reason with e
 
 ```mermaid
 flowchart TD
-    A[Query + Long Context] --> B[RLM Root Loop<br/>model -> repl code -> execute]
-    B --> C[llm_query(...) sub-call<br/>(optional)]
-    B --> D[FINAL(...) / FINAL_VAR(...)]
+    A[Query and Long Context] --> B["RLM Root Loop<br/>model to repl code to execute"]
+    B --> C[llm_query sub-call optional]
+    B --> D[FINAL or FINAL_VAR]
     C --> B
     D --> E[Final answer + trace]
 
