@@ -1,16 +1,23 @@
 # Recursive Language Model (RLM) with SimpleAgents (Python)
 
+<div align="center">
+
+[![GitHub Repo](https://img.shields.io/badge/GitHub-SimpleAgentsRLM-181717?style=for-the-badge&logo=github)](https://github.com/CraftsMan-Labs/SimpleAgentsRLM)
+[![PyPI Package](https://img.shields.io/badge/PyPI-simple--agents--py-3775A9?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/simple-agents-py/)
+[![Monthly Downloads](https://img.shields.io/badge/Monthly%20Downloads-1%2C210-0A66C2?style=for-the-badge)](https://pypistats.org/packages/simple-agents-py)
+[![Docs](https://img.shields.io/badge/Docs-simpleagents.craftsmanlabs.net-0B5FFF?style=for-the-badge&logo=readthedocs&logoColor=white)](https://docs.simpleagents.craftsmanlabs.net/)
+
+### **Production-ready Recursive Language Model orchestration with SimpleAgents**
+
+</div>
+
 Hello folks - this repo shows a practical, from-scratch implementation of a **Recursive Language Model** inspired by:
 
 - RLM paper: https://arxiv.org/abs/2512.24601
 - Python package: https://pypi.org/project/simple-agents-py/
+- Docs: https://docs.simpleagents.craftsmanlabs.net/
 
 The goal is simple: keep long context outside the one-shot prompt, reason with executable steps, and still keep workflow orchestration and traceability.
-
-## Package + downloads
-
-- Package: [`simple-agents-py`](https://pypi.org/project/simple-agents-py/)
-- Downloads (last month): **1,210** (source: [PyPIStats](https://pypistats.org/packages/simple-agents-py), fetched on 2026-02-27)
 
 ## What this repo contains
 
