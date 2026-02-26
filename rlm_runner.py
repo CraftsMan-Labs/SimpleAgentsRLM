@@ -80,6 +80,25 @@ class SimpleAgentsAdapter:
         )
         return _extract_text(response)
 
+    def call_sub(self, *, prompt: str) -> str:
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a concise sub-LLM inside an RLM. "
+                    "Return only the requested answer without extra commentary."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ]
+        response = self._client.complete(
+            self._model,
+            messages,
+            max_tokens=self._max_tokens,
+            temperature=self._temperature,
+        )
+        return _extract_text(response)
+
 
 class OpenAICompatibleAdapter:
     def __init__(
@@ -337,8 +356,9 @@ class RLMRunner:
 
     def _parse_model_turn(self, model_text: str) -> ParsedModelTurn:
         code_blocks = self._RE_REPL.findall(model_text)
-        final_var_match = self._RE_FINAL_VAR.search(model_text)
-        final_match = self._RE_FINAL.search(model_text)
+        non_code_text = self._RE_REPL.sub("", model_text)
+        final_var_match = self._RE_FINAL_VAR.search(non_code_text)
+        final_match = self._RE_FINAL.search(non_code_text)
         final_var = final_var_match.group(1) if final_var_match is not None else None
         final_text = None
         if final_var is None and final_match is not None:

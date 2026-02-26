@@ -76,7 +76,11 @@ def load_openai_compatible_config(mock_mode: bool) -> tuple[str, str, str]:
     api_key = os.getenv("WORKFLOW_API_KEY") or os.getenv("CUSTOM_API_KEY")
 
     if mock_mode:
-        return provider, api_base or "http://localhost:1/v1", api_key or "dummy"
+        return (
+            provider,
+            api_base or "http://localhost:1/v1",
+            api_key or "dummy_api_key_for_mock_mode_12345",
+        )
 
     if not api_base or not api_key:
         raise RuntimeError(
