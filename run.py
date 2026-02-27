@@ -128,6 +128,13 @@ def run_workflow(args: argparse.Namespace, context_text: str) -> dict[str, Any]:
         "rlm_mock": args.mock,
         "rlm_max_turns": args.max_turns,
         "rlm_max_subcalls": args.max_subcalls,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a workflow-driven Recursive Language Model assistant.",
+            },
+            {"role": "user", "content": args.query},
+        ],
     }
     if args.trace_file:
         workflow_input["rlm_trace_path"] = args.trace_file

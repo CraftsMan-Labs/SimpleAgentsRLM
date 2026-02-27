@@ -1,0 +1,165 @@
+# Traditional one-shot long-context workflow (no REPL tools).
+
+id: traditional-gemini-orchestrator
+version: 1.0.0
+
+metadata:
+  name: "Traditional Gemini Orchestrator"
+  description: "Single-pass llm_call baseline for comparison against RLM workflow"
+  tags: ["example", "workflow", "baseline", "traditional", "llm-call"]
+
+entry_node: detect_request_state
+
+nodes:
+  - id: detect_request_state
+    name: "Detect Request State"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          state:
+            type: string
+            enum: [ready, missing_context]
+          reason:
+            type: string
+        required: [state, reason]
+        additionalProperties: false
+      prompt: |
+        Determine if the user request has enough context for one-shot answering.
+
+        Available input:
+        - query: {{ input.rlm_query }}
+        - context: {{ input.traditional_context }}
+
+        Return JSON only:
+        {
+          "state": "ready" | "missing_context",
+          "reason": "short explanation"
+        }
+
+  - id: route_request_state
+    name: "Route Request State"
+    node_type:
+      switch:
+        branches:
+          - condition: '$.nodes.detect_request_state.output.state == "ready"'
+            target: answer_one_shot
+        default: ask_for_context
+
+  - id: ask_for_context
+    name: "Ask For Context"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          question:
+            type: string
+          status:
+            type: string
+        required: [question, status]
+        additionalProperties: false
+      prompt: |
+        Ask one concise follow-up for missing context.
+
+        Return JSON only:
+        {
+          "question": "one concise follow-up",
+          "status": "needs_clarification"
+        }
+
+  - id: answer_one_shot
+    name: "Answer One Shot"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          status:
+            type: string
+            enum: [done, failed]
+          final_answer:
+            type: string
+          notes:
+            type: string
+        required: [status, final_answer, notes]
+        additionalProperties: false
+      prompt: |
+        Solve the task in a single pass using only the provided context.
+
+        Query:
+        {{ input.rlm_query }}
+
+        Context:
+        {{ input.traditional_context }}
+
+        Rules:
+        - Do not use tool calls.
+        - Return exact answer when possible.
+        - Return JSON only.
+
+        Return JSON:
+        {
+          "status": "done" | "failed",
+          "final_answer": "answer string",
+          "notes": "brief explanation"
+        }
+
+  - id: finalize_answer
+    name: "Finalize Answer"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          answer:
+            type: string
+          status:
+            type: string
+        required: [answer, status]
+        additionalProperties: false
+      prompt: |
+        Format final output from one-shot answer node.
+
+        Use final_answer: {{ nodes.answer_one_shot.output.final_answer }}
+
+        Return JSON only:
+        {
+          "answer": "formatted answer",
+          "status": "completed"
+        }
+
+edges:
+  - from: detect_request_state
+    to: route_request_state
+  - from: answer_one_shot
+    to: finalize_answer

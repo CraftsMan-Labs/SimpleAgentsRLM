@@ -6,10 +6,10 @@ import json
 import math
 import re
 import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+
+from simple_agents_py import Client
 
 
 class LLMAdapter(Protocol):
@@ -57,12 +57,19 @@ class SimpleAgentsAdapter:
     def __init__(
         self,
         *,
-        client: Any,
         model: str,
+        provider: str = "openai",
+        api_base: str | None = None,
+        api_key: str | None = None,
+        client: Client | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
     ) -> None:
-        self._client = client
+        self._client = client or Client(
+            provider,
+            api_base=api_base,
+            api_key=api_key,
+        )
         self._model = model
         self._temperature = temperature
         self._max_tokens = max_tokens
@@ -98,105 +105,6 @@ class SimpleAgentsAdapter:
             temperature=self._temperature,
         )
         return _extract_text(response)
-
-
-class OpenAICompatibleAdapter:
-    def __init__(
-        self,
-        *,
-        api_base: str,
-        api_key: str,
-        model: str,
-        temperature: float = 0.0,
-        max_tokens: int = 2048,
-        timeout_seconds: int = 60,
-    ) -> None:
-        self._api_base = api_base.rstrip("/")
-        self._api_key = api_key
-        self._model = model
-        self._temperature = temperature
-        self._max_tokens = max_tokens
-        self._timeout_seconds = timeout_seconds
-
-    def call_root(self, *, system_prompt: str, user_prompt: str) -> str:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        return self._chat_completion(messages)
-
-    def call_sub(self, *, prompt: str) -> str:
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a concise sub-LLM inside an RLM. "
-                    "Return only the requested answer without extra commentary."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ]
-        return self._chat_completion(messages)
-
-    def _chat_completion(self, messages: list[dict[str, str]]) -> str:
-        payload = {
-            "model": self._model,
-            "messages": messages,
-            "temperature": self._temperature,
-            "max_tokens": self._max_tokens,
-        }
-        body = json.dumps(payload).encode("utf-8")
-        request = urllib.request.Request(
-            url=f"{self._api_base}/chat/completions",
-            data=body,
-            method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self._api_key}",
-            },
-        )
-        try:
-            with urllib.request.urlopen(
-                request, timeout=self._timeout_seconds
-            ) as response:
-                raw = response.read().decode("utf-8")
-        except urllib.error.HTTPError as error:
-            details = error.read().decode("utf-8", errors="ignore")
-            raise RuntimeError(
-                f"openai-compatible http error {error.code}: {details}"
-            ) from error
-        except urllib.error.URLError as error:
-            raise RuntimeError(f"openai-compatible request failed: {error}") from error
-
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as error:
-            raise RuntimeError(
-                f"invalid json response from provider: {raw[:400]}"
-            ) from error
-
-        choices = data.get("choices")
-        if not isinstance(choices, list) or len(choices) == 0:
-            raise RuntimeError(f"provider response missing choices: {data}")
-        first = choices[0]
-        if not isinstance(first, dict):
-            raise RuntimeError(f"invalid first choice payload: {first}")
-        message = first.get("message")
-        if not isinstance(message, dict):
-            raise RuntimeError(f"choice message missing or invalid: {first}")
-        content = message.get("content")
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            text_parts: list[str] = []
-            for part in content:
-                if isinstance(part, dict) and part.get("type") == "text":
-                    text = part.get("text")
-                    if isinstance(text, str):
-                        text_parts.append(text)
-            if text_parts:
-                return "".join(text_parts)
-        return str(content)
 
 
 class MockAdapter:
@@ -398,15 +306,11 @@ class RLMRunner:
 
         def restricted_import(
             name: str,
-            globals_: Any = None,
-            locals_: Any = None,
-            fromlist: Any = (),
-            level: int = 0,
+            _globals: Any = None,
+            _locals: Any = None,
+            _fromlist: Any = (),
+            _level: int = 0,
         ) -> Any:
-            _ = globals_
-            _ = locals_
-            _ = fromlist
-            _ = level
             if name in allowed_modules:
                 return allowed_modules[name]
             raise RuntimeError(f"Import not allowed in REPL: {name}")

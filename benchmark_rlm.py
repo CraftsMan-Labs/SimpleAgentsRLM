@@ -14,7 +14,7 @@ from typing import Any
 from dotenv import load_dotenv
 from simple_agents_py import Client
 
-from rlm_runner import OpenAICompatibleAdapter, RLMConfig, RLMRunner
+from rlm_runner import RLMConfig, RLMRunner, SimpleAgentsAdapter
 
 
 @dataclass
@@ -170,7 +170,7 @@ def build_tasks(seed: int, records: int) -> list[BenchmarkTask]:
 
 def run_baseline_direct(
     *,
-    adapter: OpenAICompatibleAdapter,
+    adapter: SimpleAgentsAdapter,
     task: BenchmarkTask,
     baseline_context_chars: int,
 ) -> dict[str, Any]:
@@ -196,7 +196,7 @@ def run_baseline_direct(
 
 
 def run_rlm_direct(
-    *, adapter: OpenAICompatibleAdapter, task: BenchmarkTask, args: argparse.Namespace
+    *, adapter: SimpleAgentsAdapter, task: BenchmarkTask, args: argparse.Namespace
 ) -> dict[str, Any]:
     started = time.perf_counter()
     result = RLMRunner(
@@ -234,6 +234,13 @@ def run_rlm_workflow(
         "rlm_model": model,
         "rlm_max_turns": args.max_turns,
         "rlm_max_subcalls": args.max_subcalls,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a workflow-driven Recursive Language Model assistant.",
+            },
+            {"role": "user", "content": task.query},
+        ],
     }
     started = time.perf_counter()
     output = client.run_workflow_yaml(
@@ -268,6 +275,55 @@ def run_rlm_workflow(
         "turns": turns,
         "subcalls": subcalls,
         "termination_reason": termination_reason,
+        "workflow_terminal_node": output.get("terminal_node"),
+    }
+
+
+def run_traditional_workflow(
+    *,
+    client: Client,
+    model: str,
+    task: BenchmarkTask,
+    baseline_context_chars: int,
+) -> dict[str, Any]:
+    workflow_path = Path(__file__).resolve().parent / "traditional_orchestrator.yaml"
+    workflow_input = {
+        "email_text": task.query,
+        "rlm_query": task.query,
+        "traditional_context": task.context[:baseline_context_chars],
+        "rlm_model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a precise one-shot workflow baseline assistant.",
+            },
+            {"role": "user", "content": task.query},
+        ],
+    }
+    started = time.perf_counter()
+    output = client.run_workflow_yaml(
+        str(workflow_path),
+        workflow_input,
+        include_events=False,
+        workflow_options={"telemetry": {"enabled": False}},
+    )
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+
+    terminal_output = output.get("terminal_output")
+    answer_text = ""
+    if isinstance(terminal_output, dict):
+        answer_raw = terminal_output.get("answer")
+        if isinstance(answer_raw, str):
+            answer_text = answer_raw
+        else:
+            answer_text = str(answer_raw)
+
+    parsed = _extract_first_int(answer_text)
+    return {
+        "method": "traditional_workflow_truncated",
+        "elapsed_ms": elapsed_ms,
+        "raw_answer": answer_text,
+        "parsed_answer": parsed,
         "workflow_terminal_node": output.get("terminal_node"),
     }
 
@@ -310,7 +366,10 @@ def main() -> None:
     model = args.model or model_from_env
 
     tasks = build_tasks(seed=args.seed, records=args.records)
-    adapter = OpenAICompatibleAdapter(api_base=api_base, api_key=api_key, model=model)
+    adapter = SimpleAgentsAdapter(
+        client=Client(provider, api_base=api_base, api_key=api_key),
+        model=model,
+    )
     client = Client(provider, api_base=api_base, api_key=api_key)
 
     rows: list[dict[str, Any]] = []
@@ -324,8 +383,19 @@ def main() -> None:
         rlm_workflow = run_rlm_workflow(
             client=client, model=model, task=task, args=args
         )
+        traditional_workflow = run_traditional_workflow(
+            client=client,
+            model=model,
+            task=task,
+            baseline_context_chars=args.baseline_context_chars,
+        )
 
-        for method_result in (baseline, rlm_direct, rlm_workflow):
+        for method_result in (
+            baseline,
+            traditional_workflow,
+            rlm_direct,
+            rlm_workflow,
+        ):
             parsed_answer = method_result.get("parsed_answer")
             parsed_int = parsed_answer if isinstance(parsed_answer, int) else None
             row = {

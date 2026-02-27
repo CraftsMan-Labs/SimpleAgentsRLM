@@ -24,8 +24,9 @@ The goal is simple: keep long context outside the one-shot prompt, reason with e
 ## What this repo contains
 
 - `rlm_runner.py` - core recursive loop (parse `repl` code, execute, finalize)
-- `handlers.py` - workflow custom worker (`RunRlm`) that invokes the runner
-- `rlm_orchestrator.yaml` - workflow wrapper around the RLM core
+- `handlers.py` - tool handlers (`execute_repl`, `llm_query`) used by workflow `llm_call` nodes
+- `rlm_orchestrator.yaml` - llm_call + switch orchestrator with tool-calling
+- `traditional_orchestrator.yaml` - traditional one-shot llm_call baseline workflow
 - `run.py` - CLI runner (`direct` or `workflow` mode)
 - `benchmark_rlm.py` - benchmark harness (baseline vs RLM)
 - `tests/` - smoke + utility tests
@@ -42,8 +43,8 @@ flowchart TD
 
     F[run.py] --> G[run_workflow_yaml]
     G --> H[rlm_orchestrator.yaml]
-    H --> I[handlers.py]
-    I --> J[RLM runner]
+    H --> I[llm_call with tools]
+    I --> J[execute_repl and llm_query handlers]
 ```
 
 ## Why this matches the RLM idea
@@ -101,15 +102,15 @@ Core flow:
 
 In `rlm_orchestrator.yaml`:
 
-- Use `custom_worker` node
-- Set handler to `RunRlm`
+- Use `llm_call` nodes with `output_schema`
+- Use `switch` routing for deterministic branching
+- Add tool declarations for `execute_repl` and `llm_query`
 
 In `handlers.py`:
 
-- Implement `run_rlm(...)`
-- Read workflow payload/input
-- Call `RLMRunner(...).run()`
-- Return structured output (`answer`, `turns`, `subcalls`, `trace`)
+- Implement tool handlers with deterministic signatures:
+  - `execute_repl(...)` for sandboxed code execution over state
+  - `llm_query(...)` for concise semantic sub-calls
 
 ### 6) Add CLI (`run.py`)
 
@@ -169,6 +170,13 @@ Check these proof signals:
 - `accuracy` by method
 - `avg_turns`, `avg_subcalls`
 - per-task `trace`, `termination_reason`, `correct`
+
+Compared methods include:
+
+- `baseline_direct_truncated` (direct one-shot with truncated context)
+- `traditional_workflow_truncated` (YAML one-shot workflow baseline)
+- `rlm_direct` (RLM runner)
+- `rlm_workflow` (RLM via YAML llm_call + tool calls)
 
 ## Learnings from building this
 

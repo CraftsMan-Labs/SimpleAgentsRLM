@@ -1,22 +1,297 @@
-# Workflow wrapper around Python RLM runner.
-# The recursive loop itself lives in handlers.py -> run_rlm.
+# RLM Orchestrator implemented with llm_call + switch nodes.
+# REPL execution and sub-LLM calls are exposed as tools.
 
 id: rlm-gemini-orchestrator
-version: 1.0.0
+version: 2.0.0
 
 metadata:
   name: "RLM Gemini Orchestrator"
-  description: "Run Recursive Language Model logic through custom worker with OpenAI-compatible Gemini Flash"
-  tags: ["example", "workflow", "rlm", "gemini", "openai-compatible"]
+  description: "RLM-style reasoning with llm_call nodes, tool-based REPL execution, and structured routing"
+  tags: ["example", "workflow", "rlm", "gemini", "llm-call", "tool-calling"]
 
-entry_node: run_rlm_core
+entry_node: detect_request_state
 
 nodes:
-  - id: run_rlm_core
-    name: "Run RLM Core"
+  - id: detect_request_state
+    name: "Detect Request State"
     node_type:
-      custom_worker:
-        handler: RunRlm
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
     config:
-      payload:
-        topic: rlm
+      output_schema:
+        type: object
+        properties:
+          state:
+            type: string
+            enum: [ready, missing_context, capabilities_query]
+          reason:
+            type: string
+        required: [state, reason]
+        additionalProperties: false
+      prompt: |
+        Determine if the user request has enough context for RLM-style processing.
+
+        Available input:
+        - query: {{ input.rlm_query }}
+        - context: {{ input.rlm_context }}
+
+        Return JSON only:
+        {
+          "state": "ready" | "missing_context" | "capabilities_query",
+          "reason": "short explanation"
+        }
+
+        Rules:
+        - state="capabilities_query" when user asks what this workflow can do.
+        - state="missing_context" when context is absent or too vague.
+        - state="ready" when query and context are available.
+
+  - id: route_request_state
+    name: "Route Request State"
+    node_type:
+      switch:
+        branches:
+          - condition: '$.nodes.detect_request_state.output.state == "capabilities_query"'
+            target: explain_capabilities
+          - condition: '$.nodes.detect_request_state.output.state == "ready"'
+            target: run_rlm_with_tools
+        default: ask_for_context
+
+  - id: explain_capabilities
+    name: "Explain Capabilities"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          question:
+            type: string
+        required: [question]
+        additionalProperties: false
+      prompt: |
+        Explain this workflow briefly and ask exactly one follow-up question.
+
+        Mention:
+        - it uses tool-based REPL execution
+        - it can run sub-LLM queries
+        - it returns structured output
+
+        Return JSON only:
+        {
+          "question": "short explanation plus one clear next question"
+        }
+
+  - id: ask_for_context
+    name: "Ask For Context"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          question:
+            type: string
+        required: [question]
+        additionalProperties: false
+      prompt: |
+        Ask for the minimum missing context needed.
+
+        Return JSON only:
+        {
+          "question": "one concise follow-up question requesting missing context"
+        }
+
+  - id: run_rlm_with_tools
+    name: "Run RLM With Tool Calls"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+        tools_format: simplified
+        tool_choice: auto
+        max_tool_roundtrips: 6
+        tool_calls_global_key: rlm_tool_calls
+        tools:
+          - name: execute_repl
+            description: Execute REPL Python code against a provided state object and return updated state.
+            input_schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                state:
+                  type: object
+                  additionalProperties: true
+              required: [code]
+              additionalProperties: false
+            output_schema:
+              type: object
+              properties:
+                stdout:
+                  type: string
+                error:
+                  anyOf:
+                    - type: string
+                    - type: "null"
+                state:
+                  type: object
+                  additionalProperties: true
+              required: [stdout, error, state]
+              additionalProperties: false
+          - name: llm_query
+            description: Run a concise sub-LLM query for semantic interpretation.
+            input_schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                model:
+                  type: string
+              required: [prompt]
+              additionalProperties: false
+            output_schema:
+              type: object
+              properties:
+                answer:
+                  type: string
+              required: [answer]
+              additionalProperties: false
+    config:
+      output_schema:
+        type: object
+        properties:
+          status:
+            type: string
+            enum: [done, need_clarification, failed]
+          final_answer:
+            type: string
+          notes:
+            type: string
+        required: [status, final_answer, notes]
+        additionalProperties: false
+      prompt: |
+        You are the root coordinator in an RLM-style workflow.
+
+        Available input:
+        - user query: {{ input.rlm_query }}
+        - long context: {{ input.rlm_context }}
+
+        Goals:
+        - Treat the context as external state.
+        - Use execute_repl for programmatic context processing.
+        - Use llm_query only when semantic interpretation is needed.
+        - Produce a correct final answer.
+
+        Process constraints:
+        - First initialize state with at least: query and context.
+        - Prefer exact computation over estimates.
+        - Keep tool calls bounded and relevant.
+
+        Return JSON only:
+        {
+          "status": "done" | "need_clarification" | "failed",
+          "final_answer": "final answer when done, otherwise empty string",
+          "notes": "brief explanation"
+        }
+
+  - id: route_rlm_result
+    name: "Route RLM Result"
+    node_type:
+      switch:
+        branches:
+          - condition: '$.nodes.run_rlm_with_tools.output.status == "done"'
+            target: return_answer
+        default: request_clarification
+
+  - id: return_answer
+    name: "Return Final Answer"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          answer:
+            type: string
+          status:
+            type: string
+        required: [answer, status]
+        additionalProperties: false
+      prompt: |
+        Format the final answer from the RLM node.
+
+        Use:
+        - final_answer: {{ nodes.run_rlm_with_tools.output.final_answer }}
+
+        Return JSON only:
+        {
+          "answer": "formatted answer",
+          "status": "completed"
+        }
+
+  - id: request_clarification
+    name: "Request Clarification"
+    node_type:
+      llm_call:
+        model: gemini-3-flash
+        temperature: 0.0
+        messages_path: input.messages
+        append_prompt_as_user: true
+        stream: false
+        heal: true
+    config:
+      output_schema:
+        type: object
+        properties:
+          question:
+            type: string
+          status:
+            type: string
+        required: [question, status]
+        additionalProperties: false
+      prompt: |
+        The RLM node could not confidently complete the task.
+
+        Notes: {{ nodes.run_rlm_with_tools.output.notes }}
+
+        Ask one concise clarification question.
+
+        Return JSON only:
+        {
+          "question": "one concise follow-up",
+          "status": "needs_clarification"
+        }
+
+edges:
+  - from: detect_request_state
+    to: route_request_state
+  - from: run_rlm_with_tools
+    to: route_rlm_result
