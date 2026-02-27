@@ -196,14 +196,3 @@ Here are my real takeaways:
 
 5. **Measure first, then scale**  
    Get benchmark harness in place early, then improve with async subcalls, deeper recursion, and tougher tasks.
-
-## Next upgrades (recommended)
-
-- async/batched subcalls for latency
-- stricter REPL sandboxing
-- task suite that forces semantic recursion (not only programmatic counting)
-- richer cost/token telemetry in benchmark reports
-
----
-
-If you want, I can also add a one-page diagram (`ARCHITECTURE.md`) with sequence flow and decision boundaries for publishing or LinkedIn screenshots.
